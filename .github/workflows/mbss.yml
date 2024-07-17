@@ -1,0 +1,49 @@
+name: MBSS
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+  STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
+  GIT_AUTHOR_NAME: ${{ secrets.GIT_AUTHOR_NAME }}
+  GIT_AUTHOR_EMAIL: ${{ secrets.GIT_AUTHOR_EMAIL }}
+
+jobs:
+  mbss:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Create MBSS directory
+        run: New-Item -ItemType Directory -Path ./bin/mbss
+
+      - name: Download MBSS
+        run: |
+          $url = "https://api.github.com/repos/beat-forge/MBSS/releases/latest"
+          $response = Invoke-RestMethod -Uri $url
+          $response.assets | ForEach-Object {
+            if ($_.name -like "*MBSS*.zip") {
+              $url = $_.browser_download_url
+              Invoke-WebRequest -Uri $url -OutFile ./bin/MBSS.zip
+            }
+          }
+
+      - name: Extract MBSS
+        run: Expand-Archive -Path ./bin/MBSS.zip -DestinationPath ./bin/mbss
+
+      - name: Start MBSS
+        if: ${{ !contains(github.event.head_commit.message, ':reset') }}
+        run: ./bin/mbss/MBSS.exe --repo .
+
+      - name: Start MBSS and reset
+        if: ${{ contains(github.event.head_commit.message, ':reset') }}
+        run: ./bin/mbss/MBSS.exe --repo . --reset
